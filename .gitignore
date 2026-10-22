@@ -1,0 +1,39 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+.aws/
+**/.aws/
+credentials
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+
+# Dependencies, generated outputs and reports
+node_modules/
+stack_outputs.*
+*.log
+coverage/
+dist/
+build/
+test-results/
+reports/
+junit*.xml
+.DS_Store
+Thumbs.db
+
+# Keep evidence in docs/screenshots rather than at the repository root
+/ss*.png
