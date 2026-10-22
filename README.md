@@ -4,7 +4,7 @@
 
 A two-tier file-sharing application provisioned with Python and validated with unit, integration, and recovery tests. The uploader writes a text file to a private S3 bucket; the viewer reads the same object through a separate application tier.
 
-[Architecture](#architecture) · [Setup](#setup-on-windows) · [Testing](#testing) · [Results](#recorded-results) · [Screenshots](#screenshot-evidence) · [Cleanup](#cleanup)
+[Architecture](#architecture) · [Setup](#setup-on-windows) · [Testing](#testing) · [Assignment answers](#assignment-answers) · [Results](#recorded-results) · [Screenshots](#screenshot-evidence) · [Cleanup](#cleanup)
 
 ## What this lab demonstrates
 
@@ -105,6 +105,26 @@ Deployment prints uploader and viewer URLs and writes local `stack_outputs.json`
 ```
 
 The chaos tests terminate a real in-service instance without reducing desired capacity, observe an outage, and measure recovery against `RECOVERY_SLO_SECONDS`. Run only against your deployed lab stack.
+
+## Assignment answers
+
+### Question 1: What did Moto prove, what could it not prove, and which tests covered the gap?
+
+Moto allowed me to test my AWS infrastructure code without creating real AWS resources or incurring AWS resource charges. Using pytest with Moto, I verified that my Python code creates and deletes simulated S3 buckets, IAM roles, instance profiles, launch templates, Application Load Balancers, target groups, and Auto Scaling Groups. The unit suite also checked repeated creation and deletion, IAM policy documents, security group rules, configuration parsing, and application bootstrap scripts; not every unit test required Moto.
+
+Moto could not prove actual EC2 startup, successful package installation, application availability, real IAM enforcement, or recovery timing in AWS. To cover these gaps, I ran 14 integration tests against the deployed stack and 2 chaos tests. The integration tests checked the real infrastructure configuration, target health, application endpoints, upload validation, and an upload-to-viewer round trip. IAM tests used AWS's policy simulator to evaluate allowed and denied actions; these checks complement the successful application operations, but do not directly exercise every denied operation using instance credentials.
+
+All 14 integration tests passed. Both chaos tests passed with the 180-second SLO: the uploader recovered in approximately 69.42 seconds and the viewer in 73.64 seconds. A separate 60-second SLO experiment failed for both tiers, demonstrating that successful recovery does not necessarily meet a stricter recovery objective.
+
+### Question 2: Compare `ignore_errors("EntityAlreadyExists")` with `2>/dev/null || true`.
+
+In Bash, `2>/dev/null || true` discards a command's standard error and returns success even when that command fails. This is concise, but it can hide unexpected problems such as permission errors, invalid resource names, or incorrect configurations.
+
+In Python, `ignore_errors("EntityAlreadyExists")` catches an AWS `ClientError` and ignores it only when its error code is `EntityAlreadyExists`. Other AWS error codes are raised, and exceptions outside `ClientError` also propagate. This targeted handling lets expected resource-exists conditions support repeatable infrastructure setup while keeping unexpected failures visible and easier to debug. Ignoring that error alone does not guarantee complete idempotency; the remaining code must still ensure the resource has the intended configuration.
+
+### Question 3: Challenge 5 — Pick one place where Bash was shorter than Python. What did the extra Python lines provide? (Two sentences)
+
+In my earlier Bash workflow, checking whether an S3 bucket existed with `aws s3api head-bucket` required fewer lines than the equivalent Boto3 check in `stack/storage.py`. The extra Python lines inspect AWS error codes to distinguish a missing bucket from unexpected failures such as access denied, and make that behavior easier to test and debug.
 
 ## Recorded results
 
