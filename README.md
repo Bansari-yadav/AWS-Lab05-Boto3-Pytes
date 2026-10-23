@@ -175,7 +175,7 @@ Get-ChildItem stack, tests -Recurse -File |
 
 **Explanation:** This gives the folder-layout evidence in more detail and leaves cached Python files out of the listing.
 
-![Detailed source and test layout](docs/screenshots/SS1_Project_Structure.png)
+
 
 ### 3. Policy test catches too much access
 
@@ -287,7 +287,6 @@ python delete_stack.py
 
 **Explanation:** The cleanup log reaches the end of the resource-removal steps without a displayed error.
 
-![Original cleanup completion](docs/screenshots/ss_cleanup_complete.png)
 
 ### 10. Cleanup run A
 
@@ -336,7 +335,6 @@ python -c "from stack.clients import AwsClients; a=AwsClients.create('us-east-2'
 
 **Explanation:** No load balancers or Auto Scaling Groups are returned, and no instances with the two lab Name tags are returned in the four checked states in us-east-2. This check does not list every AWS service or region, and does not independently verify bucket or IAM removal.
 
-![Post-cleanup resource checks](docs/screenshots/ss_7.png)
 
 ## Cleanup
 
