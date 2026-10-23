@@ -37,3 +37,18 @@ Thumbs.db
 
 # Keep evidence in docs/screenshots rather than at the repository root
 /ss*.png
+
+# Secrets and backup artifacts
+secrets/
+**/secrets/
+*.bak
+*.backup
+*.orig
+*.rej
+*~
+backup/
+backups/
+*.zip
+*.7z
+*.tar
+*.tar.gz

@@ -54,7 +54,7 @@ The ALB spans subnets in two Availability Zones in the default VPC. Each tier ha
 ├── lab03/                   # Retained earlier application copies
 ├── create_app_stack.sh      # Retained shell workflow
 ├── delete_app_stack.sh      # Retained shell cleanup workflow
-├── docs/screenshots/        # All nine supplied screenshots
+├── docs/screenshots/        # All 12 supplied screenshots
 ├── .env.example             # Configuration template with placeholders
 ├── pytest.ini               # Default excludes integration and chaos tests
 └── requirements.txt
@@ -110,21 +110,19 @@ The chaos tests terminate a real in-service instance without reducing desired ca
 
 ### Question 1: What did Moto prove, what could it not prove, and which tests covered the gap?
 
-Moto allowed me to test my AWS infrastructure code without creating real AWS resources or incurring AWS resource charges. Using pytest with Moto, I verified that my Python code creates and deletes simulated S3 buckets, IAM roles, instance profiles, launch templates, Application Load Balancers, target groups, and Auto Scaling Groups. The unit suite also checked repeated creation and deletion, IAM policy documents, security group rules, configuration parsing, and application bootstrap scripts; not every unit test required Moto.
-
-Moto could not prove actual EC2 startup, successful package installation, application availability, real IAM enforcement, or recovery timing in AWS. To cover these gaps, I ran 14 integration tests against the deployed stack and 2 chaos tests. The integration tests checked the real infrastructure configuration, target health, application endpoints, upload validation, and an upload-to-viewer round trip. IAM tests used AWS's policy simulator to evaluate allowed and denied actions; these checks complement the successful application operations, but do not directly exercise every denied operation using instance credentials.
-
-All 14 integration tests passed. Both chaos tests passed with the 180-second SLO: the uploader recovered in approximately 69.42 seconds and the viewer in 73.64 seconds. A separate 60-second SLO experiment failed for both tiers, demonstrating that successful recovery does not necessarily meet a stricter recovery objective.
+Moto let me run the real create and delete code against a fake AWS environment. It checked that the code built the expected resources, handled repeated setup and cleanup, and applied the expected settings; other unit tests checked configuration, policies, and startup scripts. Moto could not show that a real EC2 instance would start the apps, that AWS would enforce every permission, or how long recovery would take. The 14 passing integration tests checked the deployed resources and app behavior, including uploading a file and reading it through the viewer; the IAM checks used AWS's policy simulator rather than trying every denied action from an instance. The 2 chaos tests checked recovery on real AWS: both passed the 180-second target, at about 69.42 seconds for the uploader and 73.64 seconds for the viewer, but a separate run failed the 60-second target.
 
 ### Question 2: Compare `ignore_errors("EntityAlreadyExists")` with `2>/dev/null || true`.
 
-In Bash, `2>/dev/null || true` discards a command's standard error and returns success even when that command fails. This is concise, but it can hide unexpected problems such as permission errors, invalid resource names, or incorrect configurations.
+In Bash, `2>/dev/null || true` hides error messages and makes a failed command appear successful, so it can hide permission problems and typos too. In Python, `ignore_errors("EntityAlreadyExists")` ignores only that expected AWS error and lets other errors stop the script. This is useful when setup finds a resource that already exists: the script can continue without hiding an unrelated problem. The rest of the setup code still needs to check or update the resource's settings before we can call the whole operation safe to repeat.
 
-In Python, `ignore_errors("EntityAlreadyExists")` catches an AWS `ClientError` and ignores it only when its error code is `EntityAlreadyExists`. Other AWS error codes are raised, and exceptions outside `ClientError` also propagate. This targeted handling lets expected resource-exists conditions support repeatable infrastructure setup while keeping unexpected failures visible and easier to debug. Ignoring that error alone does not guarantee complete idempotency; the remaining code must still ensure the resource has the intended configuration.
+### Question 3: Challenge 5 - Where was Bash shorter, and what did the extra Python lines provide? (Two sentences)
 
-### Question 3: Challenge 5 — Pick one place where Bash was shorter than Python. What did the extra Python lines provide? (Two sentences)
+The bucket-exists check using `aws s3api head-bucket` in my Bash script was shorter than the Boto3 version in `stack/storage.py`. The extra Python lines check the AWS error code, so the code creates a bucket only when it is missing and leaves other errors, such as access denied, visible and easier to debug.
 
-In my earlier Bash workflow, checking whether an S3 bucket existed with `aws s3api head-bucket` required fewer lines than the equivalent Boto3 check in `stack/storage.py`. The extra Python lines inspect AWS error codes to distinguish a missing bucket from unexpected failures such as access denied, and make that behavior easier to test and debug.
+### Part J challenges 1-4: status
+
+These are not claimed as completed. The current repo has no matching pair of launch-template tag tests (challenge 1), no unit test for `RECOVERY_SLO_SECONDS="fast"` with a friendly configuration error (challenge 2), no `--dry-run` flag (challenge 3), and no integration test for a world-open SSH port 22 rule (challenge 4). The existing port 3000 test does not cover the SSH challenge. A daily SSH drift test would help a team notice when someone opens SSH access to everyone, but that is an explanation of its value, not a completed experiment.
 
 ## Recorded results
 
@@ -143,53 +141,202 @@ The passing 180-second experiment demonstrates recovery within that target for t
 
 ## Screenshot evidence
 
-All nine supplied images are embedded below using repository-relative paths. Resource names and URLs in these historical captures refer to the original lab deployment.
+All 12 supplied images are embedded below with repository-relative paths under `docs/screenshots/`. These are historical captures, not new AWS runs. Commands are transcribed from the captures unless the note explicitly says the command is outside the crop. Terminal wrapping is joined into runnable lines. The original suite has **19 unit, 14 integration, and 2 chaos tests** (35 total).
 
-### 1. Project layout
+### 1. Original project directory
 
-The original working directory, including local environment and cache folders that are excluded from this repository.
+**Purpose:** Original project directory.
 
-![Original Lab05 project directory](docs/screenshots/ss1.png)
+**Command:**
 
-### 2. Policy test catches excessive permissions
+```powershell
+Get-ChildItem -Force -Name
+```
 
-The initial test failure identifies the overly broad uploader S3 action.
+**Actual result:** Lists the project folders, apps, scripts, and local environment files.
 
-![Initial unit test run with 1 failed and 18 passed](docs/screenshots/ss_1_failed_18_passed.png)
+**Explanation:** This shows the original working folder. Seeing a local .env or .venv name does not mean its contents are committed.
 
-### 3. Final unit test result
+![Original project directory](docs/screenshots/ss1.png)
 
-![Final unit test run with 19 passed and 16 deselected](docs/screenshots/ss_unit_19_passed.png)
+### 2. Detailed source and test layout
 
-### 4. Stack creation
+**Purpose:** Detailed source and test layout.
 
-Boto3 provisions storage, IAM, launch templates, networking, load balancing, and Auto Scaling Groups, then prints both endpoints.
+**Command:**
 
-![AWS stack creation and application endpoints](docs/screenshots/ss_3.png)
+```powershell
+Get-ChildItem stack, tests -Recurse -File |
+  Where-Object { $_.FullName -notmatch '__pycache__' } |
+  Select-Object -ExpandProperty FullName
+```
 
-### 5. Integration validation
+**Actual result:** Lists the stack modules, shared test helpers, unit tests, integration tests, and recovery test file.
 
-Application behavior, access policies, load balancing, health checks, and infrastructure configuration pass all 14 selected tests.
+**Explanation:** This gives the folder-layout evidence in more detail and leaves cached Python files out of the listing.
 
-![Integration tests with 14 passed](docs/screenshots/ss_4.png)
+![Detailed source and test layout](docs/screenshots/SS1_Project_Structure.png)
 
-### 6. Recovery meets the 180-second target
+### 3. Policy test catches too much access
 
-![Both tiers recover within a 180-second SLO](docs/screenshots/ss_5.png)
+**Purpose:** Policy test catches too much access.
 
-### 7. Recovery misses the 60-second target
+**Command:**
 
-This separate experiment records both failures and preserves the stricter SLO result.
+```powershell
+python -m pytest -v
+```
 
-![Both tiers exceed a 60-second recovery SLO](docs/screenshots/ss_6.png)
+**Actual result:** 1 failed, 18 passed in 12.94 seconds. The failure compares s3:* with the expected s3:PutObject.
 
-### 8. Cleanup completion
+**Explanation:** The test catches an uploader policy that grants too much access. The screenshot includes the failing diff, but not a separate editor view of the changed source line requested by the break-it experiment checklist.
 
-![Stack cleanup reports completion](docs/screenshots/ss_cleanup_complete.png)
+![Policy test catches too much access](docs/screenshots/ss_1_failed_18_passed.png)
 
-### 9. Post-cleanup resource checks
+### 4. Final unit tests
 
-![Empty ALB, Auto Scaling Group, and lab EC2 instance lists](docs/screenshots/ss_7.png)
+**Purpose:** Final unit tests.
+
+**Command:**
+
+```powershell
+python -m pytest -v
+```
+
+**Actual result:** 19 passed, 16 deselected in 21.69 seconds.
+
+**Explanation:** The original unit suite passes after the policy is corrected. The command is supported by the earlier unit-run capture and workflow; this cropped image shows only the final output, not its command line.
+
+![Final unit tests](docs/screenshots/ss_unit_19_passed.png)
+
+### 5. Stack creation
+
+**Purpose:** Stack creation.
+
+**Command:**
+
+```powershell
+python create_stack.py
+```
+
+**Actual result:** Setup reaches the end and prints both uploader and viewer URLs.
+
+**Explanation:** The log shows bucket, IAM, launch template, network, load balancer, and Auto Scaling setup. Printing the URLs does not by itself prove the apps are ready; the integration tests check that.
+
+![Stack creation](docs/screenshots/ss_3.png)
+
+### 6. Integration tests
+
+**Purpose:** Integration tests.
+
+**Command:**
+
+```powershell
+python -m pytest -o "addopts=" -m integration -v
+```
+
+**Actual result:** 14 passed, 21 deselected in 6.22 seconds.
+
+**Explanation:** These tests check the deployed infrastructure and app behavior, including the upload-to-viewer round trip. IAM permission decisions are checked through the policy simulator.
+
+![Integration tests](docs/screenshots/ss_4.png)
+
+### 7. Recovery within 180 seconds
+
+**Purpose:** Recovery within 180 seconds.
+
+**Command:**
+
+```powershell
+python -m pytest -o "addopts=" -m chaos -s
+```
+
+**Actual result:** 2 passed, 33 deselected in 146.56 seconds. Uploader recovery: about 69.42 seconds; viewer recovery: about 73.64 seconds (SLO 180 seconds).
+
+**Explanation:** Each test terminates an instance, observes an outage, and waits for the endpoint to return. Both tiers met the recorded target. The 14-pass line at the top is from an earlier integration run.
+
+![Recovery within 180 seconds](docs/screenshots/ss_5.png)
+
+### 8. Recovery exceeds 60 seconds
+
+**Purpose:** Recovery exceeds 60 seconds.
+
+**Command:**
+
+```powershell
+python -m pytest -o "addopts=" -m chaos -s
+```
+
+**Actual result:** 2 failed, 33 deselected in 168.21 seconds. Uploader: about 83.45 seconds; viewer: about 80.31 seconds, each compared with 60.
+
+**Explanation:** This separate run used a 60-second target. The endpoints recovered, but too slowly to pass that target. The screenshot does not show how the local setting was edited or restored.
+
+![Recovery exceeds 60 seconds](docs/screenshots/ss_6.png)
+
+### 9. Original cleanup completion
+
+**Purpose:** Original cleanup completion.
+
+**Command:**
+
+```powershell
+python delete_stack.py
+```
+
+**Actual result:** The script ends with Cleanup complete.
+
+**Explanation:** The cleanup log reaches the end of the resource-removal steps without a displayed error.
+
+![Original cleanup completion](docs/screenshots/ss_cleanup_complete.png)
+
+### 10. Cleanup run A
+
+**Purpose:** Cleanup run A.
+
+**Command:**
+
+```powershell
+python delete_stack.py
+```
+
+**Actual result:** The supplied first repeat-cleanup capture ends with Cleanup complete.
+
+**Explanation:** This is one of the two saved cleanup runs used to show that cleanup can be repeated.
+
+![Cleanup run A](docs/screenshots/SS9_Cleanup_Twice_a.png)
+
+### 11. Cleanup run B
+
+**Purpose:** Cleanup run B.
+
+**Command:**
+
+```powershell
+python delete_stack.py
+```
+
+**Actual result:** The supplied second repeat-cleanup capture also ends with Cleanup complete.
+
+**Explanation:** Running cleanup again finishes without a displayed missing-resource error. The filenames identify the two runs; the captures do not show timestamps.
+
+![Cleanup run B](docs/screenshots/SS9_Cleanup_Twice_b.png)
+
+### 12. Post-cleanup resource checks
+
+**Purpose:** Post-cleanup resource checks.
+
+**Command:**
+
+```powershell
+python delete_stack.py
+python -c "from stack.clients import AwsClients; a=AwsClients.create('us-east-2'); print('ALBs:', [x['LoadBalancerName'] for x in a.elbv2.describe_load_balancers()['LoadBalancers']]); print('ASGs:', [x['AutoScalingGroupName'] for x in a.autoscaling.describe_auto_scaling_groups()['AutoScalingGroups']]); print('Lab05 EC2 instances:', [(i['InstanceId'],i['State']['Name']) for r in a.ec2.describe_instances(Filters=[{'Name':'tag:Name','Values':['uploader-app','viewer-app']},{'Name':'instance-state-name','Values':['pending','running','stopping','stopped']}])['Reservations'] for i in r['Instances']])"
+```
+
+**Actual result:** ALBs: [], ASGs: [], Lab05 EC2 instances: [].
+
+**Explanation:** No load balancers or Auto Scaling Groups are returned, and no instances with the two lab Name tags are returned in the four checked states in us-east-2. This check does not list every AWS service or region, and does not independently verify bucket or IAM removal.
+
+![Post-cleanup resource checks](docs/screenshots/ss_7.png)
 
 ## Cleanup
 
@@ -207,4 +354,4 @@ To retain the bucket, IAM roles/profiles, and launch templates intentionally:
 
 ## Repository hygiene
 
-`.gitignore` excludes `.env`, virtual environments, AWS credential directories, private-key files, caches, dependency folders, and generated stack outputs. `.env.example` contains placeholders only. Original source files and screenshot originals are preserved; the documentation uses copies under `docs/screenshots/`.
+`.gitignore` excludes `.env`, virtual environments, AWS credential directories, private-key files, caches, dependency folders, and generated stack outputs. `.env.example` contains placeholders only. Backup files and archives are excluded too. Original source files and screenshot originals are preserved; the documentation uses copies under `docs/screenshots/`.
