@@ -114,7 +114,7 @@ These are not claimed as completed. The current repo has no matching pair of lau
 
 ## Recorded results
 
-These are historical results visible in the supplied screenshots, not claims that live AWS tests were rerun for this documentation update.
+This table preserves the original historical results. The new deliberate-failure unit experiment and its passing rerun are documented separately below; live AWS tests were not rerun.
 
 | Check | Recorded outcome |
 | --- | --- |
@@ -129,7 +129,7 @@ The passing 180-second experiment demonstrates recovery within that target for t
 
 ## Screenshot evidence
 
-The nine checklist screenshots are embedded below with repository-relative paths under `docs/screenshots/`. These are historical captures, not new AWS runs. Commands are transcribed from the captures unless the note explicitly says the command is outside the crop. Terminal wrapping is joined into runnable lines. The original suite has **19 unit, 14 integration, and 2 chaos tests** (35 total).
+The nine checklist screenshots are embedded below with repository-relative paths under `docs/screenshots/`. Eight captures are historical; the deliberate-failure report is a clearly labeled new local unit-test run. No new live AWS tests were run. Commands are transcribed from the captures or saved output unless the note explicitly says the command is outside the crop. Terminal wrapping is joined into runnable lines. The original suite has **19 unit, 14 integration, and 2 chaos tests** (35 total).
 
 ### 1. Original project directory
 
@@ -149,19 +149,21 @@ Get-ChildItem -Force -Name
 
 ### 2. Policy test catches too much access
 
-**Purpose:** Policy test catches too much access.
+**Purpose:** Show the changed policy source line and the resulting failing test in one capture.
 
 **Command:**
 
 ```powershell
-python -m pytest -v
+python -m pytest -v -p no:cacheprovider
 ```
 
-**Actual result:** 1 failed, 18 passed in 12.94 seconds. The failure compares s3:* with the expected s3:PutObject.
+**Actual result:** In a new local experiment on October 22, 2026 (America/Chicago), changing line 23 of `stack/policies.py` from `"Action": ["s3:PutObject"]` to `"Action": ["s3:*"]` produced **1 failed, 18 passed, 16 deselected in 23.70 seconds**. The failing assertion expected only `s3:PutObject`.
 
-**Explanation:** The test catches an uploader policy that grants too much access. The screenshot includes the failing diff, but not a separate editor view of the changed source line requested by the break-it experiment checklist.
+**Explanation:** The browser screenshot below displays the actual source excerpt and failure-output excerpts saved during this new run. It is a report view, not a terminal/editor screenshot or the original historical capture. The original policy was restored byte-for-byte afterward; rerunning the same unit command produced **19 passed, 16 deselected in 21.73 seconds**. No AWS deployment or live integration/chaos tests were run. `-p no:cacheprovider` disables pytest's cache plugin and does not change test selection.
 
-![Policy test catches too much access](docs/screenshots/ss_1_failed_18_passed.png)
+![New deliberate-failure run showing changed source and actual failing test](docs/screenshots/break_it_new_run.png)
+
+[Complete source excerpt and test output, including the passing rerun](docs/break_it_new_run.txt).
 
 ### 3. Final unit tests
 
