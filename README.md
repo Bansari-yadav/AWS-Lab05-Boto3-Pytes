@@ -4,7 +4,7 @@
 
 A two-tier file-sharing application provisioned with Python and validated with unit, integration, and recovery tests. The uploader writes a text file to a private S3 bucket; the viewer reads the same object through a separate application tier.
 
-[Architecture](#architecture) · [Setup](#setup-on-windows) · [Testing](#testing) · [Assignment answers](#assignment-answers) · [Results](#recorded-results) · [Screenshots](#screenshot-evidence) · [Cleanup](#cleanup)
+[Setup](#setup-on-windows) · [Testing](#testing) · [Assignment answers](#assignment-answers) · [Results](#recorded-results) · [Screenshots](#screenshot-evidence) · [Cleanup](#cleanup)
 
 ## What this lab demonstrates
 
@@ -42,7 +42,7 @@ The ALB spans subnets in two Availability Zones in the default VPC. Each tier ha
 ├── lab03/                   # Retained earlier application copies
 ├── create_app_stack.sh      # Retained shell workflow
 ├── delete_app_stack.sh      # Retained shell cleanup workflow
-├── docs/screenshots/        # All 12 supplied screenshots
+├── docs/screenshots/        # Nine checklist screenshots
 ├── .env.example             # Configuration template with placeholders
 ├── pytest.ini               # Default excludes integration and chaos tests
 └── requirements.txt
@@ -123,13 +123,13 @@ These are historical results visible in the supplied screenshots, not claims tha
 | Integration tests | **14 passed**, 21 deselected |
 | Recovery with 180-second SLO | **2 passed**; uploader about 69.42 s, viewer about 73.64 s |
 | Recovery with 60-second SLO | **2 failed**; uploader about 83.45 s, viewer about 80.31 s |
-| Cleanup | Cleanup completed; subsequent checks show no ALBs, ASGs, or matching active/stopped lab EC2 instances |
+| Cleanup | Both supplied cleanup runs finish with Cleanup complete and no displayed error |
 
 The passing 180-second experiment demonstrates recovery within that target for the recorded run. The failed 60-second experiment shows that the stricter target was not met. The current uploader policy in `stack/policies.py` grants `s3:PutObject` on `shared.txt`.
 
 ## Screenshot evidence
 
-All 12 supplied images are embedded below with repository-relative paths under `docs/screenshots/`. These are historical captures, not new AWS runs. Commands are transcribed from the captures unless the note explicitly says the command is outside the crop. Terminal wrapping is joined into runnable lines. The original suite has **19 unit, 14 integration, and 2 chaos tests** (35 total).
+The nine checklist screenshots are embedded below with repository-relative paths under `docs/screenshots/`. These are historical captures, not new AWS runs. Commands are transcribed from the captures unless the note explicitly says the command is outside the crop. Terminal wrapping is joined into runnable lines. The original suite has **19 unit, 14 integration, and 2 chaos tests** (35 total).
 
 ### 1. Original project directory
 
@@ -147,25 +147,7 @@ Get-ChildItem -Force -Name
 
 ![Original project directory](docs/screenshots/ss1.png)
 
-### 2. Detailed source and test layout
-
-**Purpose:** Detailed source and test layout.
-
-**Command:**
-
-```powershell
-Get-ChildItem stack, tests -Recurse -File |
-  Where-Object { $_.FullName -notmatch '__pycache__' } |
-  Select-Object -ExpandProperty FullName
-```
-
-**Actual result:** Lists the stack modules, shared test helpers, unit tests, integration tests, and recovery test file.
-
-**Explanation:** This gives the folder-layout evidence in more detail and leaves cached Python files out of the listing.
-
-
-
-### 3. Policy test catches too much access
+### 2. Policy test catches too much access
 
 **Purpose:** Policy test catches too much access.
 
@@ -181,7 +163,7 @@ python -m pytest -v
 
 ![Policy test catches too much access](docs/screenshots/ss_1_failed_18_passed.png)
 
-### 4. Final unit tests
+### 3. Final unit tests
 
 **Purpose:** Final unit tests.
 
@@ -197,7 +179,7 @@ python -m pytest -v
 
 ![Final unit tests](docs/screenshots/ss_unit_19_passed.png)
 
-### 5. Stack creation
+### 4. Stack creation
 
 **Purpose:** Stack creation.
 
@@ -213,7 +195,7 @@ python create_stack.py
 
 ![Stack creation](docs/screenshots/ss_3.png)
 
-### 6. Integration tests
+### 5. Integration tests
 
 **Purpose:** Integration tests.
 
@@ -229,7 +211,7 @@ python -m pytest -o "addopts=" -m integration -v
 
 ![Integration tests](docs/screenshots/ss_4.png)
 
-### 7. Recovery within 180 seconds
+### 6. Recovery within 180 seconds
 
 **Purpose:** Recovery within 180 seconds.
 
@@ -245,7 +227,7 @@ python -m pytest -o "addopts=" -m chaos -s
 
 ![Recovery within 180 seconds](docs/screenshots/ss_5.png)
 
-### 8. Recovery exceeds 60 seconds
+### 7. Recovery exceeds 60 seconds
 
 **Purpose:** Recovery exceeds 60 seconds.
 
@@ -261,22 +243,7 @@ python -m pytest -o "addopts=" -m chaos -s
 
 ![Recovery exceeds 60 seconds](docs/screenshots/ss_6.png)
 
-### 9. Original cleanup completion
-
-**Purpose:** Original cleanup completion.
-
-**Command:**
-
-```powershell
-python delete_stack.py
-```
-
-**Actual result:** The script ends with Cleanup complete.
-
-**Explanation:** The cleanup log reaches the end of the resource-removal steps without a displayed error.
-
-
-### 10. Cleanup run A
+### 8. Cleanup run A
 
 **Purpose:** Cleanup run A.
 
@@ -292,7 +259,7 @@ python delete_stack.py
 
 ![Cleanup run A](docs/screenshots/SS9_Cleanup_Twice_a.png)
 
-### 11. Cleanup run B
+### 9. Cleanup run B
 
 **Purpose:** Cleanup run B.
 
@@ -307,22 +274,6 @@ python delete_stack.py
 **Explanation:** Running cleanup again finishes without a displayed missing-resource error. The filenames identify the two runs; the captures do not show timestamps.
 
 ![Cleanup run B](docs/screenshots/SS9_Cleanup_Twice_b.png)
-
-### 12. Post-cleanup resource checks
-
-**Purpose:** Post-cleanup resource checks.
-
-**Command:**
-
-```powershell
-python delete_stack.py
-python -c "from stack.clients import AwsClients; a=AwsClients.create('us-east-2'); print('ALBs:', [x['LoadBalancerName'] for x in a.elbv2.describe_load_balancers()['LoadBalancers']]); print('ASGs:', [x['AutoScalingGroupName'] for x in a.autoscaling.describe_auto_scaling_groups()['AutoScalingGroups']]); print('Lab05 EC2 instances:', [(i['InstanceId'],i['State']['Name']) for r in a.ec2.describe_instances(Filters=[{'Name':'tag:Name','Values':['uploader-app','viewer-app']},{'Name':'instance-state-name','Values':['pending','running','stopping','stopped']}])['Reservations'] for i in r['Instances']])"
-```
-
-**Actual result:** ALBs: [], ASGs: [], Lab05 EC2 instances: [].
-
-**Explanation:** No load balancers or Auto Scaling Groups are returned, and no instances with the two lab Name tags are returned in the four checked states in us-east-2. This check does not list every AWS service or region, and does not independently verify bucket or IAM removal.
-
 
 ## Cleanup
 
