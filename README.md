@@ -14,18 +14,6 @@ A two-tier file-sharing application provisioned with Python and validated with u
 - Replace failed instances with Auto Scaling Groups and measure recovery time.
 - Test configuration, IAM policies, bootstrap scripts, and resource lifecycle using pytest and Moto.
 
-## Architecture
-
-```mermaid
-flowchart TD
-    User[Browser] --> ALB[Internet-facing Application Load Balancer]
-    ALB -->|HTTP 8080| UTG[Uploader target group]
-    ALB -->|HTTP 8081| VTG[Viewer target group]
-    UTG -->|Port 3000| U[Uploader EC2 / Auto Scaling Group]
-    VTG -->|Port 3000| V[Viewer EC2 / Auto Scaling Group]
-    U -->|PutObject: shared.txt| S3[Private S3 bucket]
-    S3 -->|GetObject: shared.txt| V
-```
 
 The ALB spans subnets in two Availability Zones in the default VPC. Each tier has **one instance** (`min = desired = max = 1`) and uses ELB health checks. This supports automatic replacement, with an outage during recovery; it does not provide continuous availability through redundant instances per tier.
 
